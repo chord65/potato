@@ -7,6 +7,7 @@
 
 #include <pthread.h>
 #include <stdlib.h>
+#include <stdio.h>
 
 //任务队列结构
 typedef struct ptt_task_s{
@@ -28,8 +29,10 @@ typedef struct{
     int started; //正在运行的线程数
 }ptt_threadpool_t;
 
+
+
 //初始化线程池
-int ptt_threadpool_init(ptt_threadpool_t *pool, int thread_num);
+ptt_threadpool_t *ptt_threadpool_init(int thread_num);
 //添加任务
 int ptt_threadpool_add(ptt_threadpool_t *pool, void (*func)(void *), void *args);
 //释放线程
