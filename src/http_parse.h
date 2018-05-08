@@ -2,8 +2,8 @@
 // Created by chord on 18-5-3.
 //
 
-#ifndef POTATO_HTTP_PARSE_H
-#define POTATO_HTTP_PARSE_H
+#ifndef HTTP_PARSE_H
+#define HTTP_PARSE_H
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -16,12 +16,12 @@
 #define LF '\n'
 
 //向请求头链表添加新结点
-void http_header_list_add(http_request_header_t **head, http_request_header_t *p);
+void ptt_http_header_list_add(ptt_http_request_header_t **head, ptt_http_request_header_t *p);
 
 //解析请求行
-int http_parse_request_line(http_request_t *request);
+int ptt_http_parse_request_line(ptt_http_request_t *request);
 
 //解析请求头部
-int http_parse_request_header(http_request_t *request);
+int ptt_http_parse_request_header(ptt_http_request_t *request);
 
-#endif //POTATO_HTTP_PARSE_H
+#endif //HTTP_PARSE_H

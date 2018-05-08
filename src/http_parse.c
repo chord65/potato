@@ -5,20 +5,20 @@
 #include "http_parse.h"
 
 //向请求头链表添加新结点
-void http_header_list_add(http_request_header_t **head, http_request_header_t *p)
+void ptt_http_header_list_add(ptt_http_request_header_t **head, ptt_http_request_header_t *p)
 {
     if(*head == NULL){
         *head = p;
         p->next = NULL;
         return;
     }
-    http_request_header_t *t = (*head)->next;
+    ptt_http_request_header_t *t = (*head)->next;
     (*head)->next = p;
     p->next = t;
 }
 
 //解析请求行
-int http_parse_request_line(http_request_t *request)
+int ptt_http_parse_request_line(ptt_http_request_t *request)
 {
     enum {
         sw_start = 0,
@@ -248,7 +248,7 @@ int http_parse_request_line(http_request_t *request)
 }
 
 //解析请求头部
-int http_parse_request_header(http_request_t *request)
+int ptt_http_parse_request_header(ptt_http_request_t *request)
 {
     enum {
         sw_start = 0,
@@ -265,7 +265,7 @@ int http_parse_request_header(http_request_t *request)
 
     char ch, *p;
     size_t pi;
-    http_request_header_t *hd;
+    ptt_http_request_header_t *hd;
 
     for(pi = request->check_index; pi < request->read_index; pi++){
         p = &request->buffer[pi];
@@ -330,12 +330,12 @@ int http_parse_request_header(http_request_t *request)
             case sw_cr:{
                 if(ch == LF){
                     state = sw_crlf;
-                    hd = (http_request_header_t *)malloc(sizeof(http_request_header_t));
+                    hd = (ptt_http_request_header_t *)malloc(sizeof(ptt_http_request_header_t));
                     hd->key = request->cur_key;
                     hd->key_end = request->cur_key_end;
                     hd->value = request->cur_value;
                     hd->value_end = request->cur_value_end;
-                    http_header_list_add(&request->header_list, hd);
+                    ptt_http_header_list_add(&request->header_list, hd);
                     hd = NULL;
                     break;
                 }
@@ -349,12 +349,12 @@ int http_parse_request_header(http_request_t *request)
                     break;
                 }
                 else if(ch == LF){
-                    hd = (http_request_header_t *)malloc(sizeof(struct http_request_header_s));
+                    hd = (ptt_http_request_header_t *)malloc(sizeof(struct ptt_http_request_header_s));
                     hd->key = request->cur_key;
                     hd->key_end = request->cur_key_end;
                     hd->value = request->cur_value;
                     hd->value_end = request->cur_value_end;
-                    http_header_list_add(&request->header_list, hd);
+                    ptt_http_header_list_add(&request->header_list, hd);
                     hd = NULL;
                     goto done;
                 }
