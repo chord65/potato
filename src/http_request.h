@@ -10,6 +10,8 @@
 
 #define BUFFER_SIZE 4096
 
+#define PTT_AGAIN EAGAIN
+
 #define HTTP_INVALID_METHOD  1
 #define HTTP_INVALID_REQUEST 2
 #define HTTP_INVALID_HEAD    3
@@ -34,6 +36,8 @@ typedef struct ptt_http_request_header_s{
 //请求结构
 typedef struct {
     int fd;
+    char *root;
+    int epoll_fd
     char buffer[BUFFER_SIZE];
     size_t check_index;
     size_t read_index;
@@ -77,7 +81,7 @@ typedef struct{
 extern ptt_http_header_handle_t ptt_http_header_handle_in[];
 
 //初始化请求结构
-void ptt_http_request_init(ptt_http_request_t *q, int fd);
+void ptt_http_request_init(ptt_http_request_t *q, int fd, int epoll_fd, char *path);
 //初始化响应结构
 void ptt_http_out_init(ptt_http_out_t *out, int fd);
 

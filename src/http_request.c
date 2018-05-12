@@ -11,11 +11,13 @@ ptt_http_header_handle_t ptt_http_header_handle_in[] = {
 };
 
 //初始化请求结构
-void ptt_http_request_init(ptt_http_request_t *q, int fd)
+void ptt_http_request_init(ptt_http_request_t *q, int fd, int epoll_fd, char *path)
 {
     q->fd = fd;
+    q->epoll_fd = epoll_fd;
     q->check_index = q->read_index = 0;
     q->state = 0;
+    q->root = path;
 
     q->request_start = NULL;
     q->method = 0;
