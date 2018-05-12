@@ -37,7 +37,7 @@ typedef struct ptt_http_request_header_s{
 typedef struct {
     int fd;
     char *root;
-    int epoll_fd
+    int epoll_fd;
     char buffer[BUFFER_SIZE];
     size_t check_index;
     size_t read_index;
