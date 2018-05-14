@@ -14,7 +14,7 @@ int main(int argc, char *argv[])
     int rd;
     ptt_http_request_t *request = (ptt_http_request_t *)malloc(sizeof(ptt_http_request_t));
 
-    ptt_http_request_init(request, fd);
+    ptt_http_request_init(request, fd, 0, NULL);
 
     rd = read(request->fd, request->buffer, BUFFER_SIZE);
     request->read_index += rd;
