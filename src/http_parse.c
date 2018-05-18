@@ -3,6 +3,7 @@
 //
 
 #include "http_parse.h"
+#include "http_request.h"
 
 //向请求头链表添加新结点
 void ptt_http_header_list_add(ptt_http_request_header_t **head, ptt_http_request_header_t *p)
@@ -238,6 +239,9 @@ int ptt_http_parse_request_line(ptt_http_request_t *request)
             }
         }
     }
+    request->check_index = pi;
+    request->state = state;
+    return PTT_AGAIN;
 
     done:
     request->check_index = pi + 1;
@@ -373,6 +377,9 @@ int ptt_http_parse_request_header(ptt_http_request_t *request)
             }
         }
     }
+    request->check_index = pi;
+    request->state = state;
+    return PTT_AGAIN;
 
     done:
     request->check_index = pi+1;

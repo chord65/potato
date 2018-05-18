@@ -7,14 +7,15 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <errno.h>
 
 #define BUFFER_SIZE 4096
 
 #define PTT_AGAIN EAGAIN
 
-#define HTTP_INVALID_METHOD  1
-#define HTTP_INVALID_REQUEST 2
-#define HTTP_INVALID_HEAD    3
+#define HTTP_INVALID_METHOD  -1
+#define HTTP_INVALID_REQUEST -2
+#define HTTP_INVALID_HEAD    -3
 
 #define HTTP_UNKNOWN 1
 #define HTTP_GET     2
@@ -22,6 +23,7 @@
 #define HTTP_POST    4
 
 #define PTT_HTTP_OK        200
+#define PTT_HTTP_FORBIDDEN 403
 #define PTT_HTTP_NOT_FOUND 404
 
 //请求头结构

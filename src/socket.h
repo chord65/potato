@@ -24,5 +24,7 @@ int ptt_sock_bind_listen(int port);
 int ptt_set sock_nonblock(int sock_fd);
 //接收连接
 int ptt_accept_connection(int listen_fd, int epoll_fd, char *path);
+//关闭连接，释放请求结构
+int ptt_close_conn(ptt_http_request_t *request);
 
 #endif //SOCKET_H

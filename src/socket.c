@@ -79,3 +79,12 @@ int ptt_accept_connection(int listen_fd, int epoll_fd, char *path)
     return 0;
 }
 
+//关闭连接，释放请求结构
+int ptt_close_conn(ptt_http_request_t *request)
+{
+    int ret = close(request->fd);
+    free(request);
+    request = NULL;
+    return ret;
+}
+
