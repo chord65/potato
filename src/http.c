@@ -30,9 +30,9 @@ void ptt_do_request(void *args)
     int n_read, ret;
     char filename[FILE_NAME_LEN];
     struct stat sbuf;
-    ptt_http_out_t *out = (ptt_http_out_t *)malloc(sizeof(ptt_http_out_t));
+    ptt_http_out_t *out = NULL;
 
-    while{
+    while(1){
         //read_ptr指向缓冲区中下一个可写入的位置，取模运算用于实现循环缓冲
         read_ptr = &request->buffer[request->check_index % BUFFER_SIZE];
         //remain_size存储缓冲区可写入长度
@@ -66,23 +66,25 @@ void ptt_do_request(void *args)
         if(ret < 0)
             goto close;
 
-        //创建并初始化响应结构
-        ptt_http_out_t *out = (ptt_http_out_t *)malloc(sizeof(ptt_http_out_t));
-        ptt_http_out_init(out, fd);
-
         //解析uri，获取文件名
         ptt_parse_uri(filename, request->uri, request->uri_end);
 
         //检查文件信息，判断是否存在，以及权限
-        if(ptt_file_check(request->fd, filename, &sbuf) < 0)
+        if(ptt_file_check(fd, filename, &sbuf) < 0)
             goto close;
+
+        //创建并初始化响应结构
+        out = (ptt_http_out_t *)malloc(sizeof(ptt_http_out_t));
+        ptt_http_out_init(out, fd);
 
         //处理请求头部,分发处理函数
         ptt_http_handle_header(request->header_list, out);
 
         //处理静态请求
+        if(ptt_serve_static(fd, filename, (size_t)sbuf.st_size, out) < 0)
+            goto close;
 
-
+        goto close;
     };
     //重新注册epoll事件
     ptt_epoll_mod(request->epoll_fd, request->fd, request, EPOLLIN | EPOLLET | EPOLLONESHOT);
@@ -140,9 +142,86 @@ int ptt_file_check(int fd, char *filename, struct stat *sbuf)
     return 0;
 }
 
-void ptt_do_error(int fd, char *filename, int status, char *short_mag, char *long_msg)
+void ptt_do_error(int fd, char *filename, int status, char *short_msg, char *long_msg)
 {
+    char head[HTTP_HEAD_LEN];
+    char body[HTTP_BODY_LEN];
 
+    //写入响应报文主体
+    sprintf(body, "<!DOCTYPE html>");
+    sprintf(body, "%s<html><head><title>Potato error</title></head>", body);
+    sprintf(body, "%s<body><p align=\"center\">%d %s</p>", body, status, short_msg);
+    sprintf(body, "%s<p align=\"center\">%s : %s</p>", body, long_msg, filename);
+    sprintf(body, "%s<hr/><p align=\"center\"><em>Potato web server</em></p></body></html>", body);
+
+    //写入响应报文首部
+    sprintf(head, "HTTP/1.1 %d %s\r\n", status, short_msg);
+    sprintf(head, "%sServer: Potato\r\n", head);
+    sprintf(head, "%sContent-type: text/html\r\n", head);
+    sprintf(head, "%sContent-length: %d\r\n", head, (int)strlen(body));
+    sprintf(head, "%sConnection: close\r\n\r\n", head);
+
+    rio_writen(fd, head, strlen(head));
+    rio_writen(fd, body, strlen(body));
 }
 
+int ptt_server_static(int fd, char *filename, size_t file_size, ptt_http_out_t *out)
+{
+    char head[HTTP_HEAD_LEN];
 
+    //写入响应报文首部
+    sprintf(head, "HTTP/1.1 %d %s\r\n", out->status, ptt_get_shortmsg_from_status_code(out->status));
+    sprintf(head, "%sServer: Potato\r\n", head);
+    sprintf(head, "%sContent-type: %s\r\n", head, ptt_get_file_type(filename));
+    sprintf(head, "%sContent-length: %d\r\n", head, (int)file_size);
+    sprintf(head, "%sConnection: close\r\n\r\n", head);
+
+    //发送响应头部并验证是否完整
+    ssize_t head_len = rio_writen(fd, head, strlen(head));
+    if(head_len != strlen(head)){
+        perror("head send failed");
+        return -1;
+    }
+
+    //打开文件并映射到内存
+    int src_fd = open(filename, O_RDONLY, 0);
+    void *src_addr = mmap(0, file_size,PROT_READ, MAP_PRIVATE, src_fd, 0);
+    close(src_fd);
+    //发送文件并校验完整性
+    ssize_t body_len = rio_writen(fd, src_addr, file_size);
+    if(body_len != file_size){
+        perror("file send failed");
+        return -1;
+    }
+    munmap(src_addr, file_size);
+
+    return 0;
+}
+
+//获取文件的mime类型
+const char*ptt_get_file_type(char *filename)
+{
+    char *type;
+    do{
+        if((type = strchr(filename, '.')) == NULL)
+            break;
+
+        for(int i = 0; ptt_mime[i].key != NULL; i++){
+            if(strcasecmp(type, ptt_mime[i].key) == 0)
+                return ptt_mime[i].type;
+        }
+    }while(0);
+
+    return "text/plain";
+}
+
+// 根据状态码返回shortmsg
+const char* ptt_get_shortmsg_from_status_code(int status){
+    if(status == PTT_HTTP_OK){
+        return "OK";
+    }
+    if(status == PTT_HTTP_NOT_FOUND){
+        return "Not Found";
+    }
+    return "Unknown";
+}
