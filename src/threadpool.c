@@ -4,6 +4,8 @@
 
 #include "threadpool.h"
 
+ptt_thread_num_tid_t *thread_num_tid;
+
 ptt_threadpool_t *ptt_threadpool_init(int thread_num)
 {
     ptt_threadpool_t *pool;
@@ -23,6 +25,7 @@ ptt_threadpool_t *ptt_threadpool_init(int thread_num)
         pool->tail = NULL;
         pool->queue_size = 0;
         //初始化线程池
+        thread_num_tid = (ptt_thread_num_tid_t*)malloc(thread_num * sizeof(ptt_thread_num_tid_t));
         pool->threads = (pthread_t *)malloc(thread_num * sizeof(pthread_t));
         for(int i = 0; i < thread_num; i++){
             if(pthread_create(&pool->threads[i], NULL, ptt_threadpool_worker, (void *)pool) != 0){
@@ -31,6 +34,9 @@ ptt_threadpool_t *ptt_threadpool_init(int thread_num)
                 ptt_threadpool_destroy(pool);
                 return NULL;
             }
+            //将tid写入映射结构
+            thread_num_tid[i].thread_num = i+1;
+            thread_num_tid[i].tid = pool->threads[i];
         }
         pool->thread_count = thread_num;
         pool->started = thread_num;
@@ -151,6 +157,20 @@ void *ptt_threadpool_worker(void *args)
         if(pool->shutdown)
             break;
 
+        //获取线程编号
+        int thd_num = 0;
+        pthread_t tid = pthread_self();
+        for(int i = 0; i < pool->thread_count; i++){
+            if(thread_num_tid[i].tid == tid) {
+                thd_num = thread_num_tid[i].thread_num;
+                break;
+            }
+        }
+
+        //开始执行
+        log_info("thread %d start working", thd_num);
+        //printf("thread %lx start working\n", pthread_self());
+
         //从任务队列头部取出一个结点
         if(pool->head == NULL){
             pthread_mutex_unlock(&pool->lock);
@@ -170,6 +190,10 @@ void *ptt_threadpool_worker(void *args)
 
         //释放任务结点
         free(task);
+
+        //结束一次任务
+        log_info("thread %d finished", thd_num);
+        //printf("thread %lx finished\n", pthread_self());
     }
 
     //将正在运行的线程数减1

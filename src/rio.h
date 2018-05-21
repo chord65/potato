@@ -7,7 +7,9 @@
 
 #include <unistd.h>
 #include <errno.h>
+#include <stdio.h>
 #include <string.h>
+#include "dbg.h"
 
 #define PTT_RIO_BUFSIZE 8192
 

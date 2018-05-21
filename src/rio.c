@@ -38,8 +38,16 @@ ssize_t rio_writen(int fd, void *usrbuf, size_t n)
         if((nwriten = write(fd, bufp, nleft)) <= 0){
             if(errno == EINTR)
                 nwriten = 0; //若被中断，则重启
-            else
+            else{
+
+                log_err("errno = %d", errno);
+                /*
+                char error_msg[50];
+                sprintf(error_msg, "errno = %d\nrio_writen error", errno);
+                perror(error_msg);
+                 */
                 return -1;
+            }
         }
 
         nleft -= nwriten;

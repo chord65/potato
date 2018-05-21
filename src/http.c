@@ -11,11 +11,23 @@ char *ROOT = NULL;
 ptt_mime_type_t ptt_mime[] =
         {
                 {".html", "text/html"},
+                {".xml", "text/xml"},
+                {".xhtml", "application/xhtml+xml"},
                 {".txt", "text/plain"},
+                {".rtf", "application/rtf"},
+                {".pdf", "application/pdf"},
+                {".word", "application/msword"},
                 {".png", "image/png"},
                 {".gif", "image/gif"},
                 {".jpg", "image/jpeg"},
                 {".jpeg", "image/jpeg"},
+                {".au", "audio/basic"},
+                {".mpeg", "video/mpeg"},
+                {".mpg", "video/mpeg"},
+                {".avi", "video/x-msvideo"},
+                {".gz", "application/x-gzip"},
+                {".tar", "application/x-tar"},
+                {".css", "text/css"},
                 {NULL ,"text/plain"}
         };
 
@@ -32,6 +44,7 @@ void ptt_do_request(void *args)
     struct stat sbuf;
     ptt_http_out_t *out = NULL;
 
+
     while(1){
         //read_ptr指向缓冲区中下一个可写入的位置，取模运算用于实现循环缓冲
         read_ptr = &request->buffer[request->check_index % BUFFER_SIZE];
@@ -40,20 +53,34 @@ void ptt_do_request(void *args)
         //读取数据到缓冲区
         n_read = read(fd, read_ptr, remain_size);
 
+
         //连接关闭
-        if(n_read == 0)
-            goto close;
+        if(n_read == 0){
+            log_err("the other end closed fd : %d", fd);
+            goto have_closed;
+        }
         //非阻塞IO，若errno不是EAGAIN，则关闭连接
-        if(n_read < 0 && errno != PTT_AGAIN)
+        if(n_read < 0 && errno != PTT_AGAIN){
+            log_err("read erro : errno = %d", errno);
             goto close;
+        }
         //交出线程，不关闭socket连接，重新等待数据
-        if(n_read < 0 && errno == PTT_AGAIN)
+        if(n_read < 0 && errno == PTT_AGAIN){
+            log_err("read erro : errno = %d", errno);
             break;
+        }
+
+        //更新read_index
+        request->read_index += n_read;
+
+        log_info("new data from fd %d", fd);
 
         //解析报文请求行
         ret = ptt_http_parse_request_line(request);
         //如果报文头部不完整，则继续从套接字读取数据到用户缓冲区
         //注意这里的PTT_AGAIN是由于用户缓冲区buffer中数据不完全造成的，而不是由于套接字的缓冲区为空
+
+
         if(ret == PTT_AGAIN)
             continue;
         if(ret < 0)
@@ -69,6 +96,9 @@ void ptt_do_request(void *args)
         //解析uri，获取文件名
         ptt_parse_uri(filename, request->uri, request->uri_end);
 
+        log_info("uri = %s", filename);
+        //printf("filename : %s\n", filename);
+
         //检查文件信息，判断是否存在，以及权限
         if(ptt_file_check(fd, filename, &sbuf) < 0)
             goto close;
@@ -81,8 +111,15 @@ void ptt_do_request(void *args)
         ptt_http_handle_header(request->header_list, out);
 
         //处理静态请求
-        if(ptt_serve_static(fd, filename, (size_t)sbuf.st_size, out) < 0)
+        if(ptt_serve_static(fd, filename, (size_t)sbuf.st_size, out) < 0){
+            if(errno == EPIPE){
+                log_err("the other end closed fd : %d", fd);
+                goto have_closed;
+            }
             goto close;
+        }
+
+        log_info("send response successfully");
 
         goto close;
     };
@@ -91,9 +128,17 @@ void ptt_do_request(void *args)
     //一次响应未完成的情况下，交还worker线程使用权，等待epoll再次通知
     return;
 
+    have_closed:
+
+    //若描述符已被关闭，则释放request并返回
+    free(request);
+    return;
+
     close:
+
     //关闭连接，释放请求结构
     ptt_close_conn(request);
+
     return;
 }
 
@@ -159,13 +204,13 @@ void ptt_do_error(int fd, char *filename, int status, char *short_msg, char *lon
     sprintf(head, "%sServer: Potato\r\n", head);
     sprintf(head, "%sContent-type: text/html\r\n", head);
     sprintf(head, "%sContent-length: %d\r\n", head, (int)strlen(body));
-    sprintf(head, "%sConnection: close\r\n\r\n", head);
+    sprintf(head, "%sConnection: Close\r\n\r\n", head);
 
     rio_writen(fd, head, strlen(head));
     rio_writen(fd, body, strlen(body));
 }
 
-int ptt_server_static(int fd, char *filename, size_t file_size, ptt_http_out_t *out)
+int ptt_serve_static(int fd, char *filename, size_t file_size, ptt_http_out_t *out)
 {
     char head[HTTP_HEAD_LEN];
 
@@ -175,6 +220,7 @@ int ptt_server_static(int fd, char *filename, size_t file_size, ptt_http_out_t *
     sprintf(head, "%sContent-type: %s\r\n", head, ptt_get_file_type(filename));
     sprintf(head, "%sContent-length: %d\r\n", head, (int)file_size);
     sprintf(head, "%sConnection: close\r\n\r\n", head);
+    //sprintf(head, "%s\r\n", head);
 
     //发送响应头部并验证是否完整
     ssize_t head_len = rio_writen(fd, head, strlen(head));
@@ -187,10 +233,16 @@ int ptt_server_static(int fd, char *filename, size_t file_size, ptt_http_out_t *
     int src_fd = open(filename, O_RDONLY, 0);
     void *src_addr = mmap(0, file_size,PROT_READ, MAP_PRIVATE, src_fd, 0);
     close(src_fd);
+
     //发送文件并校验完整性
     ssize_t body_len = rio_writen(fd, src_addr, file_size);
     if(body_len != file_size){
-        perror("file send failed");
+        /* 输出log在rio_writen中完成
+        char error_msg[ERROR_MSG_LEN];
+        sprintf(error_msg, "filename = %s\nbodylen = %ld\nfile send failed", filename, body_len);
+        perror(error_msg);
+         */
+        munmap(src_addr, file_size);
         return -1;
     }
     munmap(src_addr, file_size);
@@ -201,11 +253,22 @@ int ptt_server_static(int fd, char *filename, size_t file_size, ptt_http_out_t *
 //获取文件的mime类型
 const char*ptt_get_file_type(char *filename)
 {
-    char *type;
+    char *type, *t;
+
     do{
-        if((type = strchr(filename, '.')) == NULL)
+        //找到文件名中最后一个'.'
+        type = strchr(filename, '.');
+        t = type;
+        if(t == NULL)
             break;
 
+        while((type = strchr(type+1, '.')) != NULL)
+            t = type;
+        if(t == NULL)
+            break;
+        type = t;
+
+        //匹配文件后缀和mime类型
         for(int i = 0; ptt_mime[i].key != NULL; i++){
             if(strcasecmp(type, ptt_mime[i].key) == 0)
                 return ptt_mime[i].type;

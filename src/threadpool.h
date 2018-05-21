@@ -8,6 +8,7 @@
 #include <pthread.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include "dbg.h"
 
 //任务队列结构
 typedef struct ptt_task_s{
@@ -29,6 +30,11 @@ typedef struct{
     int started; //正在运行的线程数
 }ptt_threadpool_t;
 
+//线程编号和tid的映射结构
+typedef struct {
+    pthread_t tid;
+    int thread_num;
+}ptt_thread_num_tid_t;
 
 
 //初始化线程池

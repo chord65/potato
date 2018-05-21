@@ -8,8 +8,11 @@
 int ptt_read_conf(ptt_conf_t *conf, char *filename)
 {
     FILE *fp = fopen(filename, "r");
-    if(fp == NULL)
+
+    if(fp == NULL){
+        perror("read_conf:fopen");
         return -1;
+    }
 
     char line_buf[BUFLINE];
     char* deli_pos;

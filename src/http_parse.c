@@ -41,6 +41,7 @@ int ptt_http_parse_request_line(ptt_http_request_t *request)
 
     state = request->state;
 
+
     char ch, *p;
     size_t pi;
     for(pi = request->check_index; pi < request->read_index; pi++){
@@ -239,6 +240,9 @@ int ptt_http_parse_request_line(ptt_http_request_t *request)
             }
         }
     }
+
+    printf("parse_line state = %d\n", state);
+
     request->check_index = pi;
     request->state = state;
     return PTT_AGAIN;

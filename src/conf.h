@@ -19,7 +19,7 @@ typedef struct{
     int port; //监听端口号
     int thread_num; //线程数
     char root[PATHLEN]; //文件根目录
-} ptt_conf_t;
+}ptt_conf_t;
 
 int ptt_read_conf(ptt_conf_t *conf, char *filename);
 

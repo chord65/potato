@@ -17,6 +17,7 @@
 #define FILE_NAME_LEN 255
 #define HTTP_HEAD_LEN 256
 #define HTTP_BODY_LEN 512
+#define ERROR_MSG_LEN 200
 #define DEFAULT_HTML "index.html"
 
 #define MIN(a,b) {(a) > (b) ? (a) : (b)}
@@ -25,7 +26,7 @@
 typedef struct {
     char *key;
     char *type;
-} ptt_mime_type_t;
+}ptt_mime_type_t;
 
 //处理请求报文并返回响应
 void ptt_do_request(void *args);
