@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
+#include "timer.h"
 
 #define BUFFER_SIZE 4096
 
@@ -62,6 +63,9 @@ typedef struct {
     void *cur_key_end;
     void *cur_value;
     void *cur_value_end;
+
+    //定时器
+    void *timer;
 } ptt_http_request_t;
 
 //响应结构
