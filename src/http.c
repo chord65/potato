@@ -44,6 +44,8 @@ void ptt_do_request(void *args)
     struct stat sbuf;
     ptt_http_out_t *out = NULL;
 
+    //删除定时器,处理完一次请求后重置定时器
+    ptt_del_timer(request);
 
     while(1){
         //read_ptr指向缓冲区中下一个可写入的位置，取模运算用于实现循环缓冲
@@ -86,7 +88,7 @@ void ptt_do_request(void *args)
         if(ret < 0)
             goto close;
 
-        //解析报文请部
+        //解析报文头部
         ret = ptt_http_parse_request_header(request);
         if(ret == PTT_AGAIN)
             continue;
@@ -103,34 +105,46 @@ void ptt_do_request(void *args)
         if(ptt_file_check(fd, filename, &sbuf) < 0)
             goto close;
 
+        debug("ptt_file_check finish");
+
         //创建并初始化响应结构
         out = (ptt_http_out_t *)malloc(sizeof(ptt_http_out_t));
         ptt_http_out_init(out, fd);
 
         //处理请求头部,分发处理函数
-        ptt_http_handle_header(request->header_list, out);
+        ptt_http_handle_header(request, out);
 
         //处理静态请求
         if(ptt_serve_static(fd, filename, (size_t)sbuf.st_size, out) < 0){
             if(errno == EPIPE){
                 log_err("the other end closed fd : %d", fd);
+                free(out);
                 goto have_closed;
             }
+            free(out);
             goto close;
         }
 
         log_info("send response successfully");
 
-        goto close;
+        //判断是否是长连接
+        if(!out->keep_alive){
+            log_info("short connection");
+            free(out);
+            goto close;
+        }
+        free(out);
     };
     //重新注册epoll事件
     ptt_epoll_mod(request->epoll_fd, request->fd, request, EPOLLIN | EPOLLET | EPOLLONESHOT);
-    //一次响应未完成的情况下，交还worker线程使用权，等待epoll再次通知
+    //重新添加定时器
+    ptt_add_timer(request, ptt_close_conn, DEFAULT_TIMEOUT);
+
+    //不关闭连接，交还worker线程使用权，等待epoll再次通知
     return;
 
     have_closed:
-
-    //若描述符已被关闭，则释放request并返回
+    //若描述符已被关闭,则释放request并返回
     free(request);
     return;
 
@@ -216,11 +230,19 @@ int ptt_serve_static(int fd, char *filename, size_t file_size, ptt_http_out_t *o
 
     //写入响应报文首部
     sprintf(head, "HTTP/1.1 %d %s\r\n", out->status, ptt_get_shortmsg_from_status_code(out->status));
-    sprintf(head, "%sServer: Potato\r\n", head);
     sprintf(head, "%sContent-type: %s\r\n", head, ptt_get_file_type(filename));
     sprintf(head, "%sContent-length: %d\r\n", head, (int)file_size);
-    sprintf(head, "%sConnection: close\r\n\r\n", head);
-    //sprintf(head, "%s\r\n", head);
+
+    if(out->keep_alive){
+        sprintf(head, "%sConnection: keep-alive\r\n", head);
+        sprintf(head, "%sKeep-Alive: timeout=%d\r\n", head, DEFAULT_TIMEOUT);
+    }
+    else{
+        sprintf(head, "%sConnection: close\r\n", head);
+    }
+
+    sprintf(head, "%sServer: Potato\r\n", head);
+    sprintf(head, "%s\r\n", head);
 
     //发送响应头部并验证是否完整
     ssize_t head_len = rio_writen(fd, head, strlen(head));

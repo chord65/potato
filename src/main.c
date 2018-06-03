@@ -2,6 +2,7 @@
 #include <signal.h>
 #include "http.h"
 #include "conf.h"
+#include "timer.h"
 
 #define DEFAULT_CONF "Potato.conf"
 
@@ -19,6 +20,11 @@ int main(int argc, char *argv[])
     int epoll_fd;
     //监听套接字
     int listen_fd;
+
+    //超时时间
+    time_t outtime = 50;
+    //等待时间
+    time_t waiting_time = 0;
 
     //忽略信号SIGPIPE,防止在对端关闭的情况下向socket写数据引起SIGPIE信号，导致进程终止
     if(signal(SIGPIPE, SIG_IGN) == SIG_ERR){
@@ -62,13 +68,22 @@ int main(int argc, char *argv[])
     //注册listen_fd到epoll
     ptt_epoll_add(epoll_fd, listen_fd, request, EPOLLIN  );
 
+    //初始化定时器
+    ptt_timer_init();
+
+    //epoll响应事件数
+    int events_num;
 
     printf("Potato start working!\n");
     while(1){
+        //获取距下次超时的等待时间
+        waiting_time = ptt_get_waiting_time();
         //等待epoll响应事件
-        int events_num = ptt_epoll_wait(epoll_fd, events, MAXEVENTS, -1);
+        events_num = ptt_epoll_wait(epoll_fd, events, MAXEVENTS, waiting_time);
         //处理事件,并分发操作
         ptt_handle_events(epoll_fd, tdpool, listen_fd, events, events_num, conf->root);
+        //处理超时连接,该操作优先级相对较低，所以放在最后
+        ptt_handle_expire_timer();
     }
 
 }

@@ -43,7 +43,9 @@ ptt_timer_node_t *ptt_timer_node_init(ptt_http_request_t *request, timer_handler
         log_err("malloc error");
         return NULL;
     }
+    //更新当前时间
     time_update();
+    //将当前时间加上outtime作为expire_time
     timer_node->expire_time = ptt_cur_time + outtime;
     timer_node->delete = 0;
     timer_node->handler = handler;
@@ -97,12 +99,13 @@ time_t ptt_get_waiting_time()
 
         return waiting_time > 0 ? waiting_time : 0;
     }
+    return 0;
 }
 
 //处理超时的定时器
 void ptt_handle_expire_timer()
 {
-    ptt_timer_node_t *top_timer;
+    ptt_timer_node_t *top_timer = NULL;
     int rc;
 
     while(!ptt_pq_is_empty(ptt_timer)){
@@ -110,6 +113,10 @@ void ptt_handle_expire_timer()
 
         if(top_timer->delete == 1){
             rc = ptt_pq_deltop(ptt_timer);
+            //ptt_pq_deltop函数并不执行释放内存的操作，
+            //所以在这里要记得free掉定时器的内存，防止内存泄露
+            free(top_timer);
+            top_timer = NULL;
             check(rc == 0, "ptt_pq_deltop error");
             continue;
         }
@@ -125,6 +132,9 @@ void ptt_handle_expire_timer()
 
         //删除堆顶定时器
         rc = ptt_pq_deltop(ptt_timer);
+        free(top_timer);
+        top_timer = NULL;
+
         if(rc < 0)
             log_err("ptt_pq_deltop error");
     }

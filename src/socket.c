@@ -96,6 +96,9 @@ int ptt_accept_connection(int listen_fd, int epoll_fd, char *path)
     if(ptt_epoll_add(epoll_fd, cnn_sock, request, (EPOLLIN | EPOLLET | EPOLLONESHOT)) < 0)
         return -1;
 
+    //添加定时器
+    ptt_add_timer(request, ptt_close_conn, DEFAULT_TIMEOUT);
+
     return 0;
 }
 
@@ -119,10 +122,12 @@ int ptt_close_conn(ptt_http_request_t *request)
      */
 
     int ret = close(request->fd);
-
     if(ret == 0)
         log_info("close fd : %d", request->fd);
 
+    //删除定时器
+    ptt_del_timer(request);
+    //释放请求结构
     free(request);
     request = NULL;
     return ret;

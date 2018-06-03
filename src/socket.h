@@ -15,6 +15,7 @@
 #include "socket.h"
 #include "http_request.h"
 #include "epoll.h"
+#include "timer.h"
 #include "dbg.h"
 
 #define LISTENQ 1024

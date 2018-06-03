@@ -8,7 +8,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
-#include "timer.h"
+#include "dbg.h"
 
 #define BUFFER_SIZE 4096
 
@@ -71,6 +71,7 @@ typedef struct {
 //响应结构
 typedef struct {
     int fd;
+    int keep_alive;
     int status; //状态码
 } ptt_http_out_t;
 
@@ -91,10 +92,12 @@ void ptt_http_request_init(ptt_http_request_t *q, int fd, int epoll_fd, char *pa
 //初始化响应结构
 void ptt_http_out_init(ptt_http_out_t *out, int fd);
 
-//头部处理函数
+//头部处理函数-忽略头部
 int ptt_http_header_handle_ignore(ptt_http_out_t *out, const char *data, int len);
+//处理头部字段Connection
+int ptt_http_header_handle_connection(ptt_http_out_t *out, const char *data, int len);
 
 //为不同头部分发处理函数
-void ptt_http_handle_header(ptt_http_request_header_t *head, ptt_http_out_t *out);
+void ptt_http_handle_header(ptt_http_request_t *request, ptt_http_out_t *out);
 
 #endif //HTTP_REQUEST_H
