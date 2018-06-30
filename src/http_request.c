@@ -8,7 +8,8 @@
 
 ptt_http_header_handle_t ptt_http_header_handle_in[] = {
         {"Host", ptt_http_header_handle_ignore},
-        {"Connection", ptt_http_header_handle_connection}
+        {"Connection", ptt_http_header_handle_connection},
+        {"If-Modified-Since", ptt_http_header_handle_modified}
 };
 
 //初始化请求结构
@@ -34,10 +35,12 @@ void ptt_http_request_init(ptt_http_request_t *q, int fd, int epoll_fd, char *pa
 }
 
 //初始化响应结构
-void ptt_http_out_init(ptt_http_out_t *out, int fd)
+void ptt_http_out_init(ptt_http_out_t *out, int fd, time_t tm)
 {
     out->fd = fd;
     out->keep_alive = 0;
+    out->modified = 1;
+    out->mtime = tm;
     //默认为OK
     out->status = PTT_HTTP_OK;
 }
@@ -54,6 +57,22 @@ int ptt_http_header_handle_connection(ptt_http_out_t *out, const char *data, int
     debug("handle header Connection");
     if(strncasecmp("keep-alive", data, len) == 0)
         out->keep_alive = 1;
+    return 0;
+}
+
+//处理头部字段If-Modified-Since
+int ptt_http_header_handle_modified(ptt_http_out_t *out, const char *data, int len)
+{
+    struct tm mtm;
+    if(strptime(data, "%a, %d %b %Y %H:%M:%S GMT", &mtm) == NULL)
+        return -1;
+
+    time_t t = mktime(&mtm);
+    if(difftime(t, out->mtime) < 1e-6){
+        out->modified = 0;
+        out->status = PTT_HTTP_NOT_MODIFIED;
+    }
+
     return 0;
 }
 

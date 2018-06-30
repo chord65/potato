@@ -1,5 +1,5 @@
 CC = gcc
-CFLAG = -lpthread
+CFLAG = -lpthread -std=gnu11
 
 TARGET = Potato
 D_SRC = src

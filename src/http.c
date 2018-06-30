@@ -109,7 +109,7 @@ void ptt_do_request(void *args)
 
         //创建并初始化响应结构
         out = (ptt_http_out_t *)malloc(sizeof(ptt_http_out_t));
-        ptt_http_out_init(out, fd);
+        ptt_http_out_init(out, fd, sbuf.st_mtim.tv_sec);
 
         //处理请求头部,分发处理函数
         ptt_http_handle_header(request, out);
@@ -227,11 +227,17 @@ void ptt_do_error(int fd, char *filename, int status, char *short_msg, char *lon
 int ptt_serve_static(int fd, char *filename, size_t file_size, ptt_http_out_t *out)
 {
     char head[HTTP_HEAD_LEN];
+    char m_time[HTTP_HEAD_LEN];
 
     //写入响应报文首部
     sprintf(head, "HTTP/1.1 %d %s\r\n", out->status, ptt_get_shortmsg_from_status_code(out->status));
-    sprintf(head, "%sContent-type: %s\r\n", head, ptt_get_file_type(filename));
-    sprintf(head, "%sContent-length: %d\r\n", head, (int)file_size);
+
+    if(out->modified){
+        strftime(m_time, HTTP_HEAD_LEN, "%a, %d %b %Y %H:%M:%S GMT", gmtime(&out->mtime));
+        sprintf(head, "%sContent-type: %s\r\n", head, ptt_get_file_type(filename));
+        sprintf(head, "%sContent-length: %d\r\n", head, (int)file_size);
+        sprintf(head, "%sLast-Modified: %s\r\n", head, m_time);
+    }
 
     if(out->keep_alive){
         sprintf(head, "%sConnection: keep-alive\r\n", head);
@@ -302,11 +308,11 @@ const char*ptt_get_file_type(char *filename)
 
 // 根据状态码返回shortmsg
 const char* ptt_get_shortmsg_from_status_code(int status){
-    if(status == PTT_HTTP_OK){
-        return "OK";
+    switch(status){
+        case PTT_HTTP_OK: return "OK";
+        case PTT_HTTP_NOT_FOUND: return "Not Found";
+        case PTT_HTTP_FORBIDDEN: return "Forbidden";
+        case PTT_HTTP_NOT_MODIFIED: return "Not Modified";
+        default: return "Unknown";
     }
-    if(status == PTT_HTTP_NOT_FOUND){
-        return "Not Found";
-    }
-    return "Unknown";
 }
